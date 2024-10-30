@@ -137,7 +137,7 @@ export default function ChatPage() {
     setStreamingMessage('')
 
     try {
-      const response = await fetch('/api/v1/chat/completions', {
+      const response = await fetch('https://api.zgi.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
