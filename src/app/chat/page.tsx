@@ -1,18 +1,15 @@
 'use client'
 
 import * as React from "react"
-import { Bot, SendHorizontal, Plus, Paperclip, Image as ImageIcon, Search } from 'lucide-react'
+import { Bot, SendHorizontal, Plus, Search } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { http } from '@/lib/http'
-import type { ChatMessage, ChatCompletionResponse } from '@/types/chat'
-import { useState, useRef } from 'react'
 
-interface Message {
+interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
 }
@@ -39,12 +36,42 @@ interface StreamChunk {
   }[]
 }
 
+// 添加类型定义
+interface ChatHistory {
+  id: string
+  title: string
+  messages: ChatMessage[]
+  createdAt: string
+}
+
+// 添加 localStorage 相关的函数
+const STORAGE_KEY = 'chat_histories'
+
+// 加载聊天历史
+const loadChatHistories = () => {
+  if (typeof window === 'undefined') return []
+  const saved = localStorage.getItem(STORAGE_KEY)
+  return saved ? JSON.parse(saved) : []
+}
+
+// 保存聊天历史
+const saveChatHistories = (histories: ChatHistory[]) => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(histories))
+}
+
 export default function Component() {
   const [messages, setMessages] = useState<ChatMessage[]>([SYSTEM_MESSAGE])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [streamingMessage, setStreamingMessage] = useState('')
-  const messagesEndRef = React.useRef<HTMLDivElement>(null)
+  const [chatHistories, setChatHistories] = useState<ChatHistory[]>(() => loadChatHistories())
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null)
+
+  // 监听聊天历史变化并保存
+  useEffect(() => {
+    saveChatHistories(chatHistories)
+  }, [chatHistories])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -54,12 +81,38 @@ export default function Component() {
     scrollToBottom()
   }, [messages])
 
+  // 创建新聊天的函数
+  const createNewChat = () => {
+    const newChat: ChatHistory = {
+      id: Date.now().toString(),
+      title: 'New Chat',
+      messages: [SYSTEM_MESSAGE],
+      createdAt: new Date().toISOString()
+    }
+    setChatHistories(prev => [newChat, ...prev])
+    setCurrentChatId(newChat.id)
+    setMessages([SYSTEM_MESSAGE])
+  }
+
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
     if (!input.trim() || isLoading) return
 
+    // 如果没有当前聊天，创建一个新的
+    if (!currentChatId) {
+      createNewChat()
+    }
+
     const userMessage: ChatMessage = { role: 'user', content: input.trim() }
     setMessages(prev => [...prev, userMessage])
+    
+    // 更新聊天历史
+    setChatHistories(prev => prev.map(chat => 
+      chat.id === currentChatId
+        ? { ...chat, messages: [...chat.messages, userMessage] }
+        : chat
+    ))
+
     setInput('')
     setIsLoading(true)
     setStreamingMessage('')
@@ -122,6 +175,22 @@ export default function Component() {
         }])
       }
 
+      // 在成功接收到回复后，更新聊天历史的标题（使用第一条消息作为标题）
+      if (fullMessage) {
+        const assistantMessage = { role: 'assistant' as const, content: fullMessage }
+        setChatHistories(prev => prev.map(chat => {
+          if (chat.id === currentChatId) {
+            const updatedMessages = [...chat.messages, assistantMessage]
+            // 如果是新聊天，使用用户的第一条消息作为标题
+            const title = chat.title === 'New Chat' 
+              ? userMessage.content.slice(0, 30) + (userMessage.content.length > 30 ? '...' : '')
+              : chat.title
+            return { ...chat, messages: updatedMessages, title }
+          }
+          return chat
+        }))
+      }
+
     } catch (error) {
       console.error('Error:', error)
     } finally {
@@ -138,12 +207,25 @@ export default function Component() {
     }
   }
 
+  // 加载特定聊天的函数
+  const loadChat = (chatId: string) => {
+    const chat = chatHistories.find(c => c.id === chatId)
+    if (chat) {
+      setCurrentChatId(chatId)
+      setMessages(chat.messages)
+    }
+  }
+
   return (
     <div className="flex h-[100dvh] bg-background">
       {/* Sidebar */}
       <div className="hidden md:flex w-[300px] flex-col border-r">
         <div className="p-4 space-y-4">
-          <Button variant="outline" className="w-full justify-start gap-2">
+          <Button 
+            variant="outline" 
+            className="w-full justify-start gap-2"
+            onClick={createNewChat}
+          >
             <Plus className="h-4 w-4" />
             New Chat
           </Button>
@@ -156,19 +238,20 @@ export default function Component() {
 
         <ScrollArea className="flex-1 px-2">
           <div className="space-y-1 p-2">
-            <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">Recent Chats</h2>
-            <Button variant="ghost" className="w-full justify-start">
-              <Bot className="mr-2 h-4 w-4" />
-              Understanding React Hooks
-            </Button>
-            <Button variant="ghost" className="w-full justify-start">
-              <Bot className="mr-2 h-4 w-4" />
-              TypeScript Best Practices
-            </Button>
-            <Button variant="ghost" className="w-full justify-start">
-              <Bot className="mr-2 h-4 w-4" />
-              Next.js App Router
-            </Button>
+            <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">
+              Recent Chats
+            </h2>
+            {chatHistories.map((chat) => (
+              <Button
+                key={chat.id}
+                variant={currentChatId === chat.id ? "secondary" : "ghost"}
+                className="w-full justify-start text-left"
+                onClick={() => loadChat(chat.id)}
+              >
+                <Bot className="mr-2 h-4 w-4" />
+                <span className="truncate">{chat.title}</span>
+              </Button>
+            ))}
           </div>
         </ScrollArea>
       </div>
