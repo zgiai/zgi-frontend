@@ -101,7 +101,7 @@ export default function Component() {
     setStreamingMessage('')
 
     try {
-      const response = await fetch('https://api.zgi.ai/v1/chat/completions', {
+      const response = await fetch('/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -239,7 +239,7 @@ export default function Component() {
         </ScrollArea>
       </div>
 
-      {/* Main Chat Area */}q
+      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         <ScrollArea className="flex-1 p-4">
           <div className="max-w-3xl mx-auto">
