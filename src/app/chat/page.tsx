@@ -149,7 +149,7 @@ export default function ChatPage() {
           temperature: 0.7,
           top_p: 1.0,
           n: 1,
-          max_tokens: 100
+          max_tokens: 4096
         })
       })
 
