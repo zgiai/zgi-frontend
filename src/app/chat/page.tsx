@@ -1,15 +1,18 @@
 'use client'
 
 import * as React from "react"
-import { Bot, SendHorizontal, Plus, Search } from 'lucide-react'
+import { Bot, SendHorizontal, Plus, Paperclip, Image as ImageIcon, Search } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { http } from '@/lib/http'
+import type { ChatMessage, ChatCompletionResponse } from '@/types/chat'
+import { useState, useRef } from 'react'
 
-interface ChatMessage {
+interface Message {
   role: 'user' | 'assistant'
   content: string
 }
@@ -44,34 +47,14 @@ interface ChatHistory {
   createdAt: string
 }
 
-// 添加 localStorage 相关的函数
-const STORAGE_KEY = 'chat_histories'
-
-// 加载聊天历史
-const loadChatHistories = () => {
-  if (typeof window === 'undefined') return []
-  const saved = localStorage.getItem(STORAGE_KEY)
-  return saved ? JSON.parse(saved) : []
-}
-
-// 保存聊天历史
-const saveChatHistories = (histories: ChatHistory[]) => {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(histories))
-}
-
 export default function Component() {
   const [messages, setMessages] = useState<ChatMessage[]>([SYSTEM_MESSAGE])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [streamingMessage, setStreamingMessage] = useState('')
-  const [chatHistories, setChatHistories] = useState<ChatHistory[]>(() => loadChatHistories())
+  const messagesEndRef = React.useRef<HTMLDivElement>(null)
+  const [chatHistories, setChatHistories] = useState<ChatHistory[]>([])
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
-
-  // 监听聊天历史变化并保存
-  useEffect(() => {
-    saveChatHistories(chatHistories)
-  }, [chatHistories])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -237,7 +220,7 @@ export default function Component() {
         </div>
 
         <ScrollArea className="flex-1 px-2">
-          <div className="space-y-1 p-2">
+          <div className="space-y-1 p-2">a
             <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">
               Recent Chats
             </h2>
@@ -256,7 +239,7 @@ export default function Component() {
         </ScrollArea>
       </div>
 
-      {/* Main Chat Area */}
+      {/* Main Chat Area */}q
       <div className="flex-1 flex flex-col">
         <ScrollArea className="flex-1 p-4">
           <div className="max-w-3xl mx-auto">
