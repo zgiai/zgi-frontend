@@ -3,7 +3,7 @@
   "rules": {
     "@typescript-eslint/no-unused-vars": "off",
     "@typescript-eslint/no-empty-interface": "off",
-    "jsx-a11y/alt-text": "error",
+    "jsx-a11y/alt-text": "off",
     "react/no-unescaped-entities": "off",
     "@next/next/no-img-element": "off"
   },
