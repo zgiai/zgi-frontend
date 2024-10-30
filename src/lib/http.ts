@@ -2,9 +2,9 @@ import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
 
 // Define API configurations
 export const API_CONFIG = {
-  ADMIN: 'https://api.zgi.com',
-  CLIENT: 'https://api.zgi.com',
-  COMMON: 'https://api.zgi.com',
+  ADMIN: 'https://api.zgi.ai',
+  CLIENT: 'https://api.zgi.ai',
+  COMMON: 'https://api.zgi.ai',
 } as const
 
 // Type for API endpoints
@@ -29,6 +29,9 @@ class Http {
         timeout: 10000,
         headers: {
           'Content-Type': 'application/json',
+          // Add CORS headers
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,PATCH,OPTIONS'
         },
       })
 
