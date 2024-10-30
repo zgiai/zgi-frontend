@@ -130,29 +130,14 @@ export default function ChatPage() {
     e.preventDefault()
     if (!input.trim() || isLoading) return
 
-    // 如果没有当前聊天，创建一个新的
-    if (!currentChatId) {
-      createNewChat()
-    }
-
     const userMessage: ChatMessage = { role: 'user', content: input.trim() }
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setIsLoading(true)
-
-    // 更新聊天历史
-    setChatHistories(prev => prev.map(chat => 
-      chat.id === currentChatId
-        ? { 
-            ...chat, 
-            messages: [...chat.messages, userMessage],
-            title: chat.title === 'New Chat' ? userMessage.content.slice(0, 30) : chat.title
-          }
-        : chat
-    ))
+    setStreamingMessage('')
 
     try {
-      const response = await fetch('https://api.zgi.ai/v1/chat/completions', {
+      const response = await fetch('/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -164,67 +149,75 @@ export default function ChatPage() {
           temperature: 0.7,
           top_p: 1.0,
           n: 1,
-          max_tokens: 4096
+          max_tokens: 100
         })
       })
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
       
       const reader = response.body?.getReader()
+      if (!reader) throw new Error('No reader available')
+
       const decoder = new TextDecoder()
-
       let fullMessage = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
 
-        const chunk = decoder.decode(value)
-        const lines = chunk
-          .split('\n')
-          .filter(line => line.trim() !== '' && line.trim() !== 'data: [DONE]')
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6))
-            const content = data.choices[0]?.delta?.content
-            if (content) {
-              fullMessage += content
-              setStreamingMessage(fullMessage)
+          const chunk = decoder.decode(value)
+          const lines = chunk
+            .split('\n')
+            .filter(line => line.trim() !== '' && line.trim() !== 'data: [DONE]')
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6))
+                const content = data.choices[0]?.delta?.content
+                if (content) {
+                  fullMessage += content
+                  setStreamingMessage(fullMessage)
+                }
+              } catch (error) {
+                console.error('Error parsing JSON:', error)
+              }
             }
-          } catch (error) {
-            console.error('Error parsing JSON:', error)
           }
         }
+
+        if (fullMessage) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: fullMessage
+          }])
+
+          // 更新聊天历史
+          setChatHistories(prev => prev.map(chat => {
+            if (chat.id === currentChatId) {
+              return {
+                ...chat,
+                messages: [...chat.messages, userMessage, { role: 'assistant', content: fullMessage }]
+              }
+            }
+            return chat
+          }))
+        }
+
+      } catch (error) {
+        console.error('Error reading stream:', error)
+      } finally {
+        reader.releaseLock()
       }
+
+    } catch (error) {
+      console.error('Error:', error)
+    } finally {
+      setIsLoading(false)
+      setStreamingMessage('')
     }
-
-    if (fullMessage) {
-      const assistantMessage = {
-        role: 'assistant',
-        content: fullMessage
-      }
-      
-      setMessages(prev => [...prev, assistantMessage])
-
-      // 在收到响应后更新聊天历史
-      if (fullMessage) {
-        const assistantMessage = { role: 'assistant', content: fullMessage }
-        setChatHistories(prev => prev.map(chat => 
-          chat.id === currentChatId
-            ? { ...chat, messages: [...chat.messages, assistantMessage] }
-            : chat
-        ))
-      }
-    }
-
-  } catch (error) {
-    console.error('Error:', error)
-  } finally {
-    setIsLoading(false)
-    setStreamingMessage('')
   }
-}
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Check if Enter is pressed without Shift key
