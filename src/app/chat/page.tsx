@@ -1,16 +1,16 @@
 'use client'
 
 import * as React from "react"
-import { Bot, SendHorizontal, Plus, Paperclip, Image as ImageIcon, Search } from 'lucide-react'
+import { Bot, SendHorizontal, Plus, Paperclip, Image as ImageIcon, Search, Trash2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { http } from '@/lib/http'
 import type { ChatMessage, ChatCompletionResponse } from '@/types/chat'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -47,45 +47,109 @@ interface ChatHistory {
   createdAt: string
 }
 
-export default function Component() {
-  const [messages, setMessages] = useState<ChatMessage[]>([SYSTEM_MESSAGE])
+const STORAGE_KEY = 'chat_histories'
+
+export default function ChatPage() {
+  // 添加 messagesEndRef 定义
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // 1. 首先定义所有状态
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null)
+  const [chatHistories, setChatHistories] = useState<ChatHistory[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [streamingMessage, setStreamingMessage] = useState('')
-  const messagesEndRef = React.useRef<HTMLDivElement>(null)
-  const [chatHistories, setChatHistories] = useState<ChatHistory[]>([])
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null)
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+  // 2. 在组件加载时从 localStorage 加载数据
+  useEffect(() => {
+    const loadChatHistories = () => {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        const histories = JSON.parse(saved)
+        setChatHistories(histories)
+        
+        // 如果没有当前选中的聊天，自动选择最新的一个
+        if (!currentChatId && histories.length > 0) {
+          const mostRecent = histories[0]
+          setCurrentChatId(mostRecent.id)
+          setMessages(mostRecent.messages)
+        }
+      }
+    }
 
-  React.useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    loadChatHistories()
+  }, []) // 只在组件挂载时执行一次
 
-  // 创建新聊天的函数
+  // 3. 当聊天历史更新时保存到 localStorage
+  useEffect(() => {
+    if (chatHistories.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(chatHistories))
+    }
+  }, [chatHistories])
+
+  // 4. 创建新聊天的函数
   const createNewChat = () => {
     const newChat: ChatHistory = {
       id: Date.now().toString(),
       title: 'New Chat',
-      messages: [SYSTEM_MESSAGE],
+      messages: [],
       createdAt: new Date().toISOString()
     }
     setChatHistories(prev => [newChat, ...prev])
     setCurrentChatId(newChat.id)
-    setMessages([SYSTEM_MESSAGE])
+    setMessages([])
   }
 
+  // 5. 加载特定聊天的函数
+  const loadChat = (chatId: string) => {
+    const chat = chatHistories.find(c => c.id === chatId)
+    if (chat) {
+      setCurrentChatId(chatId)
+      setMessages(chat.messages)
+    }
+  }
+
+  // 6. 删除聊天的函数
+  const deleteChat = (chatId: string, e: React.MouseEvent) => {
+    e.stopPropagation() // 防止触发聊天选择
+    setChatHistories(prev => prev.filter(chat => chat.id !== chatId))
+    if (currentChatId === chatId) {
+      const remaining = chatHistories.filter(chat => chat.id !== chatId)
+      if (remaining.length > 0) {
+        loadChat(remaining[0].id)
+      } else {
+        setCurrentChatId(null)
+        setMessages([])
+      }
+    }
+  }
+
+  // 7. 修改发送消息函数，确保更新 chatHistories
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
     if (!input.trim() || isLoading) return
+
+    // 如果没有当前聊天，创建一个新的
+    if (!currentChatId) {
+      createNewChat()
+    }
 
     const userMessage: ChatMessage = { role: 'user', content: input.trim() }
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setIsLoading(true)
-    setStreamingMessage('')
+
+    // 更新聊天历史
+    setChatHistories(prev => prev.map(chat => 
+      chat.id === currentChatId
+        ? { 
+            ...chat, 
+            messages: [...chat.messages, userMessage],
+            title: chat.title === 'New Chat' ? userMessage.content.slice(0, 30) : chat.title
+          }
+        : chat
+    ))
 
     try {
       const response = await fetch('https://api.zgi.ai/v1/chat/completions', {
@@ -136,10 +200,22 @@ export default function Component() {
     }
 
     if (fullMessage) {
-      setMessages(prev => [...prev, {
+      const assistantMessage = {
         role: 'assistant',
         content: fullMessage
-      }])
+      }
+      
+      setMessages(prev => [...prev, assistantMessage])
+
+      // 在收到响应后更新聊天历史
+      if (fullMessage) {
+        const assistantMessage = { role: 'assistant', content: fullMessage }
+        setChatHistories(prev => prev.map(chat => 
+          chat.id === currentChatId
+            ? { ...chat, messages: [...chat.messages, assistantMessage] }
+            : chat
+        ))
+      }
     }
 
   } catch (error) {
@@ -158,53 +234,59 @@ export default function Component() {
     }
   }
 
-  // 加载特定聊天的函数
-  const loadChat = (chatId: string) => {
-    const chat = chatHistories.find(c => c.id === chatId)
-    if (chat) {
-      setCurrentChatId(chatId)
-      setMessages(chat.messages)
-    }
+  // 添加自动滚动到底部的效果
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
+
+  // 当消息更新时自动滚动
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, streamingMessage])
 
   return (
     <div className="flex h-[100dvh] bg-background">
-      {/* Sidebar */}
       <div className="hidden md:flex w-[300px] flex-col border-r">
-        <div className="p-4 space-y-4">
+        <div className="p-4">
           <Button 
             variant="outline" 
-            className="w-full justify-start gap-2"
+            className="w-full justify-start gap-2 mb-4"
             onClick={createNewChat}
+            type="button"
           >
             <Plus className="h-4 w-4" />
-            New Chat
+            <span>New Chat</span>
           </Button>
-          
-          <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search chats..." className="pl-8" />
-          </div>
-        </div>
 
-        <ScrollArea className="flex-1 px-2">
-          <div className="space-y-1 p-2">a
-            <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight mb-2">
               Recent Chats
             </h2>
-            {chatHistories.map((chat) => (
-              <Button
-                key={chat.id}
-                variant={currentChatId === chat.id ? "secondary" : "ghost"}
-                className="w-full justify-start text-left"
-                onClick={() => loadChat(chat.id)}
-              >
-                <Bot className="mr-2 h-4 w-4" />
-                <span className="truncate">{chat.title}</span>
-              </Button>
-            ))}
+            <ScrollArea className="h-[calc(100vh-180px)]">
+              <div className="space-y-1">
+                {chatHistories.map((chat) => (
+                  <div key={chat.id} className="flex items-center gap-2 px-2">
+                    <Button
+                      variant={currentChatId === chat.id ? "secondary" : "ghost"}
+                      className="w-full justify-start text-left"
+                      onClick={() => loadChat(chat.id)}
+                    >
+                      <Bot className="mr-2 h-4 w-4" />
+                      <span className="truncate">{chat.title}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => deleteChat(chat.id, e)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
       {/* Main Chat Area */}
@@ -215,50 +297,30 @@ export default function Component() {
               <div
                 key={index}
                 className={cn(
-                  "mb-4 flex",
-                  message.role === 'assistant' ? "justify-start" : "justify-end"
+                  "mb-4",
+                  message.role === "user" ? "ml-auto" : "mr-auto"
                 )}
               >
-                <div className="flex gap-3 max-w-[80%]">
-                  {message.role === 'assistant' && (
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Bot className="h-4 w-4" />
-                    </div>
-                  )}
-                  <Card className={cn(
-                    "p-4",
-                    message.role === 'assistant' 
-                      ? "bg-muted" 
-                      : "bg-primary text-primary-foreground"
-                  )}>
-                    {message.content}
-                  </Card>
-                </div>
+                <Card className={cn(
+                  "max-w-[80%]",
+                  message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+                )}>
+                  <CardContent className="p-3">
+                    <p className="whitespace-pre-wrap">{message.content}</p>
+                  </CardContent>
+                </Card>
               </div>
             ))}
-            {isLoading && (
-              <div className="mb-4 flex justify-start">
-                <div className="flex gap-3 max-w-[80%]">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Bot className="h-4 w-4" />
-                  </div>
-                  <Card className="p-4 bg-muted">
-                    <div className="flex gap-2">
-                      <div className="animate-bounce">●</div>
-                      <div className="animate-bounce [animation-delay:0.2s]">●</div>
-                      <div className="animate-bounce [animation-delay:0.4s]">●</div>
-                    </div>
-                  </Card>
-                </div>
-              </div>
-            )}
             {streamingMessage && (
-              <div className="mb-4 flex justify-start">
-                <div className="rounded-lg px-4 py-2 max-w-[80%] bg-muted">
-                  {streamingMessage}
-                </div>
+              <div className="mr-auto mb-4">
+                <Card className="bg-muted max-w-[80%]">
+                  <CardContent className="p-3">
+                    <p className="whitespace-pre-wrap">{streamingMessage}</p>
+                  </CardContent>
+                </Card>
               </div>
             )}
+            {/* 添加 ref 元素用于滚动 */}
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
