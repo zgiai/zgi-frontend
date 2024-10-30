@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
 
 // Define API configurations
 export const API_CONFIG = {
@@ -98,7 +98,7 @@ class Http {
     const { endpoint, ...axiosConfig } = config
     const instance = this.getInstance(endpoint)
     try {
-      const response = await instance.request<any, T>(axiosConfig)
+      const response = await instance.request<unknown, T>(axiosConfig)
       return response
     } catch (error) {
       throw error
@@ -115,7 +115,11 @@ class Http {
   }
 
   // POST method
-  public async post<T>(url: string, data?: any, config: HttpConfig = {}): Promise<T> {
+  public async post<T>(
+    url: string, 
+    data?: Record<string, unknown>, 
+    config: HttpConfig = {}
+  ): Promise<T> {
     return this.request<T>({
       ...config,
       method: 'POST',
@@ -125,7 +129,11 @@ class Http {
   }
 
   // PUT method
-  public async put<T>(url: string, data?: any, config: HttpConfig = {}): Promise<T> {
+  public async put<T>(
+    url: string, 
+    data?: Record<string, unknown>, 
+    config: HttpConfig = {}
+  ): Promise<T> {
     return this.request<T>({
       ...config,
       method: 'PUT',
