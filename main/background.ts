@@ -16,7 +16,7 @@ if (isProd) {
   const mainWindow = createWindow('main', {
     width: 1000,
     height: 600,
-    title: 'AI',
+    title: 'ZGIChat',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
