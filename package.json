@@ -9,9 +9,6 @@
 		"lint": "biome check --fix --no-errors-on-unmatched --files-ignore-unknown=true ./src",
 		"dev": "nextron",
 		"build": "nextron build",
-		"next:dev": "next dev",
-		"next:build": "next build",
-		"next:start": "next start",
 		"postinstall": "electron-builder install-app-deps"
 	},
 	"dependencies": {
