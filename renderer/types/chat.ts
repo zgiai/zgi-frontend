@@ -1,6 +1,8 @@
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
+  id?: string
   content: string
+  timestamp?: string
 }
 
 export interface ChatCompletionRequest {
@@ -15,5 +17,22 @@ export interface ChatCompletionRequest {
 
 export interface ChatCompletionResponse {
   message: ChatMessage
-  // Add other response fields if needed
-} 
+  id: string
+  created: number
+  model: string
+  usage: {
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
+}
+
+export interface ChatHistory {
+  id: string
+  title: string
+  messages: ChatMessage[]
+  createdAt: string
+  updatedAt?: number
+  model?: string
+  favorite?: boolean
+}
