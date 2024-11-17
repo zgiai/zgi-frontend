@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import { useChatStore } from '@/store/chat'
+import { useChatStore } from '@/store/chat.store'
 import type { ChatCompletionResponse, ChatMessage } from '@/types/chat'
 import {
   Bot,

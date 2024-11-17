@@ -1,4 +1,4 @@
-import { useChatStore } from '@/store/chat'
+import { useChatStore } from '@/store/chat.store'
 import { MessageCircle, Plus, Search } from 'lucide-react'
 import React, { useState } from 'react'
 
