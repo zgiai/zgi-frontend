@@ -1,15 +1,41 @@
 import { useChatStore } from '@/store/chat.store'
+import { debounce } from 'lodash'
 import { MessageCircle, Plus, Search } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 
 const Sidebar = () => {
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const { chatHistories, currentChatId, createChat, setCurrentChatId, deleteChat } = useChatStore()
 
-  // 搜索过滤聊天记录
-  const filteredChats = chatHistories.filter((chat) =>
-    chat.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  // 使用 lodash 的 debounce
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setDebouncedQuery(value)
+      }, 300),
+    [],
   )
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setSearchQuery(value)
+    debouncedSearch(value)
+  }
+
+  // 优化搜索过滤逻辑
+  const filteredChats = chatHistories.filter((chat) => {
+    const titleMatch = chat.title.toLowerCase().includes(debouncedQuery.toLowerCase())
+
+    // 如果标题匹配或没有搜索词，直接返回
+    if (titleMatch || !debouncedQuery) return true
+
+    // 搜索最近的5条消息内容
+    const recentMessages = chat.messages.slice(-5)
+    return recentMessages.some((message) =>
+      message.content.toLowerCase().includes(debouncedQuery.toLowerCase()),
+    )
+  })
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen">
@@ -27,7 +53,7 @@ const Sidebar = () => {
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleSearchChange}
             placeholder="搜索对话"
             className="bg-transparent outline-none w-full"
           />

@@ -1,8 +1,16 @@
 export interface ChatMessage {
+  /** 角色 */
   role: 'system' | 'user' | 'assistant'
+  /** 消息id */
   id?: string
+  /** 消息内容 */
   content: string
+  /** 消息时间戳 */
   timestamp?: string
+  /** 文件类型 */
+  fileType?: string
+  /** 文件名称 */
+  fileName?: string
 }
 
 export interface ChatCompletionRequest {

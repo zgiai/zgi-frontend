@@ -101,7 +101,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     window.ipc.invoke(INVOKE_CHANNLE.saveChats, data)
   }, 1000),
 
-  sendMessage: (message) => {
+  sendMessage: (message: ChatMessage) => {
     const { currentChatId, chatHistories } = get()
 
     // 如果没有当前聊天，创建一个新的
@@ -109,7 +109,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     if (!chatId) {
       const newChat = {
         id: Date.now().toString(),
-        title: message.content.slice(0, 20),
+        title: message.content.slice(0, 20) || '新对话',
         messages: [],
         createdAt: new Date().toISOString(),
       }
@@ -129,7 +129,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
           const isFirstMessage = chat.messages.length === 0
           return {
             ...chat,
-            title: isFirstMessage ? message.content.slice(0, 20) : chat.title,
+            title: isFirstMessage ? message.content.slice(0, 20) || '新对话' : chat.title,
             messages: [...chat.messages, message],
           }
         }

@@ -10,10 +10,50 @@ import { FixedSizeList as List } from 'react-window'
 const MessageItem = ({ message, style }) => {
   const isUser = message.role === 'user'
 
+  const renderContent = () => {
+    if (message.fileType === 'image') {
+      // 处理base64图片数据
+      const imageUrl = message.content.startsWith('data:')
+        ? message.content
+        : `data:image/jpeg;base64,${message.content}`
+
+      return (
+        <div className="max-w-sm">
+          <img
+            src={imageUrl}
+            alt={message.fileName || '图片'}
+            className="rounded-lg max-w-full h-auto"
+          />
+          {message.fileName && <div className="text-sm mt-1 text-gray-500">{message.fileName}</div>}
+        </div>
+      )
+    }
+
+    return (
+      <ReactMarkdown
+        components={{
+          code({ node, className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || '')
+            return !match ? (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            ) : (
+              <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
+                {String(children).replace(/\n$/, '')}
+              </SyntaxHighlighter>
+            )
+          },
+        }}
+      >
+        {message.content}
+      </ReactMarkdown>
+    )
+  }
+
   return (
     <div style={style} className="py-2">
-      <div className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-        {/* 头像 */}
+      <div className={`flex items-start gap-4 px-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
         <div className="flex-shrink-0">
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center ${
@@ -28,35 +68,12 @@ const MessageItem = ({ message, style }) => {
           </div>
         </div>
 
-        {/* 消息内容 */}
         <div
           className={`max-w-[80%] rounded-lg p-3 ${
-            isUser ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-800'
+            isUser ? 'bg-[#F5FAFF] text-gray-800' : 'bg-white text-gray-800'
           }`}
         >
-          <ReactMarkdown
-            components={{
-              code({ node, className, children, ...props }) {
-                const match = /language-(\w+)/.exec(className || '')
-                return !match ? (
-                  <code className={className} {...props}>
-                    {children}
-                  </code>
-                ) : (
-                  <SyntaxHighlighter
-                    style={vscDarkPlus}
-                    language={match[1]}
-                    PreTag="div"
-                    {...props}
-                  >
-                    {String(children).replace(/\n$/, '')}
-                  </SyntaxHighlighter>
-                )
-              },
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
+          {renderContent()}
         </div>
       </div>
     </div>
@@ -82,7 +99,7 @@ const ChatArea = () => {
 
   if (!currentChatId) {
     return (
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 p-4">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-center mb-4">
             <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
@@ -115,18 +132,33 @@ const ChatArea = () => {
   }
 
   return (
-    <div className="flex-1 overflow-hidden p-4">
-      <div className="max-w-3xl mx-auto h-full">
-        <List
-          ref={listRef}
-          height={window.innerHeight - 180} // 减去头部和输入框的高度
-          itemCount={messages.length}
-          itemSize={100} // 预估的每个消息高度
-          width="100%"
-        >
-          {({ index, style }) => <MessageItem message={messages[index]} style={style} />}
-        </List>
-      </div>
+    <div className="h-full bg-white">
+      <List
+        ref={listRef}
+        height={window.innerHeight - 240}
+        itemCount={messages.length}
+        itemSize={100}
+        width="100%"
+        className="scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent bg-white"
+        style={{
+          overflow: 'overlay',
+          paddingBottom: '6rem',
+        }}
+      >
+        {({ index, style }) => (
+          <MessageItem
+            message={messages[index]}
+            style={
+              index === messages.length - 1
+                ? {
+                    ...style,
+                    marginBottom: '6rem',
+                  }
+                : style
+            }
+          />
+        )}
+      </List>
     </div>
   )
 }

@@ -31,11 +31,13 @@
 		"react-syntax-highlighter": "^15.6.1",
 		"react-window": "^1.8.10",
 		"tailwind-merge": "^2.5.4",
+		"tailwind-scrollbar": "^3.1.0",
 		"tailwindcss-animate": "^1.0.7",
 		"zustand": "^5.0.1"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
+		"@types/lodash": "^4.17.13",
 		"@types/node": "^20.11.16",
 		"@types/react": "^18.2.52",
 		"autoprefixer": "^10.4.19",
