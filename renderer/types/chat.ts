@@ -1,6 +1,9 @@
+// 定义消息类型
+export type Role = 'system' | 'user' | 'assistant'
+
 export interface ChatMessage {
   /** 角色 */
-  role: 'system' | 'user' | 'assistant'
+  role: Role
   /** 消息id */
   id?: string
   /** 消息内容 */

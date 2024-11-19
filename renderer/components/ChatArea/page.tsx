@@ -9,8 +9,26 @@ import { FixedSizeList as List } from 'react-window'
 // 消息项组件
 const MessageItem = ({ message, style }) => {
   const isUser = message.role === 'user'
+  const isStreaming = message.isStreaming
 
   const renderContent = () => {
+    // 如果是流式消息且没有内容（正在加载）
+    if (isStreaming && !message.content) {
+      return (
+        <div className="flex items-center space-x-2">
+          <div className="flex space-x-1">
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+          <span className="text-sm text-gray-500">AI is thinking...</span>
+        </div>
+      )
+    }
+
+    // 如果是流式消息且有内容，添加打字机效果的类
+    const contentClass = isStreaming ? 'typing-effect' : ''
+
     if (message.fileType === 'image') {
       // 处理base64图片数据
       const imageUrl = message.content.startsWith('data:')
@@ -30,24 +48,26 @@ const MessageItem = ({ message, style }) => {
     }
 
     return (
-      <ReactMarkdown
-        components={{
-          code({ node, className, children, ...props }) {
-            const match = /language-(\w+)/.exec(className || '')
-            return !match ? (
-              <code className={className} {...props}>
-                {children}
-              </code>
-            ) : (
-              <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
-                {String(children).replace(/\n$/, '')}
-              </SyntaxHighlighter>
-            )
-          },
-        }}
-      >
-        {message.content}
-      </ReactMarkdown>
+      <div className={contentClass}>
+        <ReactMarkdown
+          components={{
+            code({ node, className, children, ...props }) {
+              const match = /language-(\w+)/.exec(className || '')
+              return !match ? (
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              ) : (
+                <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
+                  {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+              )
+            },
+          }}
+        >
+          {message.content}
+        </ReactMarkdown>
+      </div>
     )
   }
 
@@ -81,14 +101,43 @@ const MessageItem = ({ message, style }) => {
 }
 
 const ChatArea = () => {
-  const { currentChatId, chatHistories, loadChatsFromDisk } = useChatStore()
+  const { 
+    currentChatId, 
+    chatHistories, 
+    loadChatsFromDisk,
+    messageStreamingMap,
+    isLoadingMap 
+  } = useChatStore()
   const listRef = useRef<any>(null)
   const currentChat = chatHistories.find((chat) => chat.id === currentChatId)
-  const messages = currentChat?.messages || []
 
   useEffect(() => {
     loadChatsFromDisk()
   }, [])
+
+  // 获取当前对话的流式消息和加载状态
+  const streamingMessage = messageStreamingMap[currentChatId || '']
+  const isLoading = isLoadingMap[currentChatId || '']
+
+  // 合并消息列表，包含实时流式消息
+  const getAllMessages = () => {
+    if (!currentChat) return []
+    
+    const baseMessages = currentChat.messages || []
+    
+    // 如果有流式消息或正在加载，添加一个临时消息
+    if (streamingMessage || isLoading) {
+      return [...baseMessages, {
+        role: 'assistant',
+        content: streamingMessage || '',
+        isStreaming: true
+      }]
+    }
+    
+    return baseMessages
+  }
+
+  const messages = getAllMessages()
 
   // 自动滚动到底部
   useEffect(() => {

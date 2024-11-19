@@ -4,7 +4,7 @@ import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
 export const API_CONFIG = {
   ADMIN: 'https://api.zgi.ai',
   CLIENT: 'https://api.zgi.ai',
-  COMMON: 'https://api.zgi.ai',
+  COMMON: 'https://api.agicto.cn/v1',
 } as const
 
 // Type for API endpoints
@@ -45,7 +45,8 @@ class Http {
     // Request interceptor
     instance.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem('auth_token')
+        // const token = localStorage.getItem('auth_token')
+        const token = 'sk-DV7fnAi6a6f5qYN2AqEM6VQiyYOS4NTETYRoZHENptDSHdMI'
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
