@@ -1,7 +1,5 @@
-import { http } from "@/lib/http";
-import { Role } from "@/types/chat";
-
-
+import { http } from '@/lib/http'
+import type { Role } from '@/types/chat'
 
 interface ChatMessage {
   role: Role
@@ -11,7 +9,7 @@ interface ChatMessage {
 interface ChatCompletionOptions {
   model?: string
   temperature?: number
-  max_tokens?: number
+  presence_penalty?: number
   stream?: boolean
 }
 
@@ -23,23 +21,17 @@ interface ChatCompletionOptions {
  */
 export const chatCompletions = async (
   messages: ChatMessage[],
-  options: ChatCompletionOptions = {}
+  options: ChatCompletionOptions = {},
 ) => {
-  const {
-    model = 'gpt-4o',
-    temperature = 0.7,
-    max_tokens = 2000,
-    stream = false
-  } = options
+  const { model = 'gpt-4o', temperature = 0.7, stream = false } = options
 
   const response = await http.post('/chat/completions', {
     model,
     messages,
     temperature,
-    max_tokens,
-    stream
+    stream,
   })
-  
+
   return response
 }
 
@@ -51,27 +43,17 @@ export const chatCompletions = async (
  */
 export const streamChatCompletions = async (
   messages: ChatMessage[],
-  options: ChatCompletionOptions = {}
+  options: ChatCompletionOptions = {},
 ) => {
-  const {
-    model = 'gpt-4',
-    temperature = 0.7,
-    max_tokens = 2000
-  } = options
+  const { model = 'gpt-3.5-turbo', temperature = 1, presence_penalty = 0 } = options
 
   const response = await http.post('/chat/completions', {
     model,
     messages,
-    temperature, 
-    max_tokens,
-    stream: true
-  }, {
-    responseType: 'stream'
+    temperature,
+    presence_penalty,
+    stream: true,
   })
-
-  if (!response) {
-    throw new Error('响应为空')
-  }
 
   return response
 }
@@ -81,69 +63,39 @@ export const streamChatCompletions = async (
  * @param response 响应数据流
  * @param onMessage 消息回调函数
  */
-export const handleChatStream = async (
-  response: any,
-  onMessage: (message: string) => void
-) => {
-  const reader = response.data
-  const decoder = new TextDecoder()
+export const handleChatStream = async (response: any, onMessage: (message: string) => void) => {
+  const reader = response.data // 直接使用 axios 响应中的 data
 
   try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
+    // 创建事件源
+    const eventSource = new EventSource(reader)
 
-      const chunk = decoder.decode(value)
-      const lines = chunk.split('\n')
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6)
-          if (data === '[DONE]') return
+    return new Promise((resolve, reject) => {
+      eventSource.onmessage = (event) => {
+        if (event.data === '[DONE]') {
+          eventSource.close()
+          resolve(undefined)
+          return
+        }
 
-          try {
-            const parsed = JSON.parse(data)
-            const content = parsed.choices[0]?.delta?.content
-            if (content) {
-              onMessage(content)
-            }
-          } catch (e) {
-            console.error('解析流数据失败:', e)
+        try {
+          const data = JSON.parse(event.data)
+          const content = data.choices?.[0]?.delta?.content
+          if (content) {
+            onMessage(content)
           }
+        } catch (error) {
+          console.error('解析消息失败:', error)
         }
       }
-    }
-  } finally {
-    if (reader.releaseLock) {
-      reader.releaseLock()
-    }
+
+      eventSource.onerror = (error) => {
+        eventSource.close()
+        reject(error)
+      }
+    })
+  } catch (error) {
+    console.error('处理流失败:', error)
+    throw error
   }
 }
-
-/**
- * 使用示例:
- * 
- * // 在组件中使用
- * const sendMessage = async () => {
- *   const messages = [
- *     { role: 'user', content: '你好' }
- *   ]
- *   
- *   try {
- *     // 发起流式请求
- *     const response = await streamChatCompletions(messages)
- *     
- *     // 处理流式响应
- *     await handleChatStream(response, (message) => {
- *       // 这里可以实时更新UI显示接收到的消息
- *       console.log('收到消息片段:', message)
- *       // 例如:
- *       // setMessages(prev => [...prev, message])
- *     })
- *   } catch (error) {
- *     console.error('发送消息失败:', error)
- *   }
- * }
- */
-
-

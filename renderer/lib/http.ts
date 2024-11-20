@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
+import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 
 // Define API configurations
 export const API_CONFIG = {
@@ -12,6 +12,7 @@ export type ApiEndpoint = keyof typeof API_CONFIG
 
 interface HttpConfig extends AxiosRequestConfig {
   endpoint?: ApiEndpoint
+  body: any
 }
 
 class Http {
@@ -31,7 +32,7 @@ class Http {
           'Content-Type': 'application/json',
           // Add CORS headers
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,PATCH,OPTIONS'
+          'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,PATCH,OPTIONS',
         },
       })
 
@@ -54,7 +55,7 @@ class Http {
       },
       (error) => {
         return Promise.reject(error)
-      }
+      },
     )
 
     // Response interceptor
@@ -84,7 +85,7 @@ class Http {
           }
         }
         return Promise.reject(error)
-      }
+      },
     )
   }
 
@@ -120,10 +121,27 @@ class Http {
 
   // POST method
   public async post<T>(
-    url: string, 
-    data?: Record<string, unknown>, 
-    config: HttpConfig = {}
+    url: string,
+    data?: Record<string, unknown>,
+    config: HttpConfig = {},
   ): Promise<T> {
+    const { endpoint, ...axiosConfig } = config
+    const instance = this.getInstance(endpoint)
+
+    // 如果需要流式响应，使用特殊处理
+    if (config.responseType === 'stream') {
+      const response = await instance.post(url, data, {
+        ...axiosConfig,
+        responseType: 'stream',
+        // 重要：添加以下配置以支持流式响应
+        onDownloadProgress: (progressEvent) => {
+          // 处理下载进度
+        },
+      })
+      return response as T
+    }
+
+    // 普通请求使用原有逻辑
     return this.request<T>({
       ...config,
       method: 'POST',
@@ -134,9 +152,9 @@ class Http {
 
   // PUT method
   public async put<T>(
-    url: string, 
-    data?: Record<string, unknown>, 
-    config: HttpConfig = {}
+    url: string,
+    data?: Record<string, unknown>,
+    config: HttpConfig = {},
   ): Promise<T> {
     return this.request<T>({
       ...config,
@@ -157,4 +175,4 @@ class Http {
 }
 
 // Create and export a single instance
-export const http = new Http() 
+export const http = new Http()

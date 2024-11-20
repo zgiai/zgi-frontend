@@ -14,7 +14,7 @@ export default function Home() {
           <ChatArea />
         </div>
         <InputArea />
-        <Footer />
+        {/* <Footer /> */}
       </div>
     </div>
   )
