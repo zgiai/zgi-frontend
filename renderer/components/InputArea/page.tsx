@@ -86,7 +86,10 @@ const InputArea = () => {
   }
 
   return (
-    <div className="bg-white border-t border-gray-200 p-4">
+    <div
+      className="absolute bottom-0 right-0 bg-white border-t border-gray-200 p-4"
+      style={{ width: 'calc(100% - 260px)' }}
+    >
       <div className="max-w-3xl mx-auto">
         <div className="flex flex-col">
           {/* 附件预览区域 */}
@@ -132,13 +135,13 @@ const InputArea = () => {
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="输入您的问题，可通过enter发送，或使用shift+enter换行"
-              className="flex-1 p-3 outline-none resize-none min-h-[40px]"
+              className="flex-1 p-3 outline-none resize-none min-h-[40px] max-h-[200px]"
               rows={1}
             />
           </div>
 
-          {/* 底部功能区 */}
-          <div className="flex justify-between items-center mt-2 text-sm">
+          {/* 底部功能区 - 确保可见性 */}
+          <div className="flex justify-between items-center mt-2 text-sm z-10">
             <div className="flex items-center gap-4">
               {/* 文件上传按钮 - 使用 FileText 替换 Paperclip */}
               <button

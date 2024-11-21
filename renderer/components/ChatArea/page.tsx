@@ -151,7 +151,7 @@ const ChatArea = () => {
 
   if (!currentChatId) {
     return (
-      <div className="flex-1 p-4 h-[calc(100vh-64px)]">
+      <div className="flex-1 p-4 h-[calc(100vh-180px)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center justify-center mb-4">
             <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
@@ -181,8 +181,8 @@ const ChatArea = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-144px)] bg-white overflow-y-auto">
-      <div className="max-w-[1200px] mx-auto">
+    <div className="h-[calc(100vh-180px)] bg-white overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400">
+      <div className="max-w-[1200px] mx-auto pb-4">
         {messages.map((message, index) => (
           <MessageItem
             key={index}
