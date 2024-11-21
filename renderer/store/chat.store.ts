@@ -23,6 +23,8 @@ interface ChatStore {
   loadChatsFromDisk: () => void // 从磁盘加载对话
   saveChatsToDisk: () => void // 保存对话到磁盘
   sendMessage: (message: ChatMessage) => void // 发送消息
+  updateChatTitleByContent: (chatId: string) => void // 添加新方法
+  isFirstOpen: boolean  // 添加标记是否是首次打开的状态
 }
 
 /**
@@ -31,12 +33,46 @@ interface ChatStore {
 export const useChatStore = create<ChatStore>()((set, get) => {
   const storageAdapter = getStorageAdapter()
 
+  // 添加更新标题的辅助函数
+  const updateChatTitleByContent = (chatId: string) => {
+    const { chatHistories, isFirstOpen } = get()
+    const chat = chatHistories.find(c => c.id === chatId)
+    
+    // 只有在首次打开软件时更新标题
+    if (!chat || !chat.messages.length || !isFirstOpen) return
+
+    // 获取第一条文字消息
+    const firstTextMessage = chat.messages.find(msg => 
+      msg.role === 'user' && !msg.fileType && msg.content.trim()
+    )
+    
+    if (firstTextMessage) {
+      const newTitle = firstTextMessage.content.slice(0, 20) + 
+        (firstTextMessage.content.length > 20 ? '...' : '')
+      
+      set((state) => ({
+        chatHistories: state.chatHistories.map((c) => {
+          if (c.id === chatId) {
+            return {
+              ...c,
+              title: newTitle,
+            }
+          }
+          return c
+        }),
+      }))
+      
+      get().saveChatsToDisk()
+    }
+  }
+
   return {
     // 初始状态
     currentChatId: null,
     chatHistories: [],
     messageStreamingMap: {},
     isLoadingMap: {},
+    isFirstOpen: true,  // 添加首次打开标记
 
     /**
      * 设置当前选中的对话ID
@@ -126,6 +162,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
           set({
             chatHistories: data.chatHistories || [],
             currentChatId: data.currentChatId || null,
+            isFirstOpen: true,  // 每次加载时重置为 true
           })
         }
       } catch (error) {
@@ -151,7 +188,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
      * @param message 用户发送的消息
      */
     sendMessage: async (message: ChatMessage) => {
-      const { currentChatId } = get()
+      const { currentChatId, isFirstOpen } = get()
       let chatId = currentChatId
 
       // 检查是否已经在加载状态
@@ -159,9 +196,10 @@ export const useChatStore = create<ChatStore>()((set, get) => {
       if (isLoading) return
 
       if (!chatId) {
+        // 创建新对话时不设置标题，等第一条消息发送后再设置
         const newChat = {
           id: Date.now().toString(),
-          title: message.content.slice(0, 20) || '新对话',
+          title: '新对话',
           messages: [],
           createdAt: new Date().toISOString(),
         }
@@ -177,20 +215,31 @@ export const useChatStore = create<ChatStore>()((set, get) => {
       const currentChat = get().chatHistories.find((chat) => chat.id === chatId)
       if (!currentChat) return
 
-      // 添加用户消息并设置加载状态
+      // 添加用户消息
       const newMessages = [...currentChat.messages, message]
       set((state) => ({
         chatHistories: state.chatHistories.map((chat) => {
           if (chat.id === chatId) {
+            // 如果是首次打开且是文字消息，使用它作为标题
+            const shouldUpdateTitle = isFirstOpen && 
+              message.role === 'user' && 
+              !message.fileType && 
+              message.content.trim()
+
             return {
               ...chat,
               messages: newMessages,
+              // 如果应该更新标题，则使用消息内容作为标题
+              title: shouldUpdateTitle 
+                ? (message.content.slice(0, 20) + (message.content.length > 20 ? '...' : ''))
+                : chat.title
             }
           }
           return chat
         }),
         isLoadingMap: { ...state.isLoadingMap, [chatId]: true },
         messageStreamingMap: { ...state.messageStreamingMap, [chatId]: '' },
+        isFirstOpen: false,  // 发送消息后标记为非首次打开
       }))
 
       try {
@@ -287,5 +336,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
         }
       }
     },
+
+    updateChatTitleByContent,  // 导出方法
   }
 })
