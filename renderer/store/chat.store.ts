@@ -1,4 +1,4 @@
-import { API_CONFIG } from '@/lib/http'
+import { API_CONFIG, token } from '@/lib/http'
 import { getStorageAdapter } from '@/lib/storageAdapter'
 import { handleChatStream, streamChatCompletions } from '@/server/chat.server'
 import type { ChatHistory, ChatMessage } from '@/types/chat'
@@ -119,7 +119,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
     /**
      * 更新指定对话的消息列表
      * @param chatId 对话ID
-     * @param messages 新的消息列表
+     * @param messages 新消息列表
      */
     updateChatMessages: (chatId, messages) => {
       set((state) => ({
@@ -172,7 +172,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
 
     /**
      * 保存对话历史到存储
-     * 使用防抖以避免频繁保存
+     * 用防抖以避免频繁保存
      */
     saveChatsToDisk: debounce(() => {
       const state = get()
@@ -215,105 +215,155 @@ export const useChatStore = create<ChatStore>()((set, get) => {
       const currentChat = get().chatHistories.find((chat) => chat.id === chatId)
       if (!currentChat) return
 
-      // 添加用户消息
+      // 添加用户消息到历史记录
       const newMessages = [...currentChat.messages, message]
+      
+      // 更新状态，立即显示用户消息
       set((state) => ({
         chatHistories: state.chatHistories.map((chat) => {
           if (chat.id === chatId) {
-            // 如果是首次打开且是文字消息，使用它作为标题
-            const shouldUpdateTitle = isFirstOpen && 
-              message.role === 'user' && 
-              !message.fileType && 
-              message.content.trim()
-
             return {
               ...chat,
               messages: newMessages,
-              // 如果应该更新标题，则使用消息内容作为标题
-              title: shouldUpdateTitle 
-                ? (message.content.slice(0, 20) + (message.content.length > 20 ? '...' : ''))
-                : chat.title
             }
           }
           return chat
         }),
+      }))
+
+      // 如果是文件消息且标记为不需要 AI 回复，直接返回
+      if (message.skipAIResponse) {
+        return
+      }
+
+      // 设置加载状态
+      set((state) => ({
         isLoadingMap: { ...state.isLoadingMap, [chatId]: true },
         messageStreamingMap: { ...state.messageStreamingMap, [chatId]: '' },
-        isFirstOpen: false,  // 发送消息后标记为非首次打开
       }))
 
       try {
-        // 发送请求到AI并获取响应
-        const token = 'sk-DV7fnAi6a6f5qYN2AqEM6VQiyYOS4NTETYRoZHENptDSHdMI'
-        const response = await fetch(`${API_CONFIG.COMMON}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: token,
-          },
-          body: JSON.stringify({
-            model: 'gpt-3.5-turbo',
-            messages: newMessages,
-            stream: true,
-            temperature: 1,
-            top_p: 1.0,
-          }),
+        // 修改发送给 AI 的消息格式
+        const messagesToSend = currentChat.messages.map(msg => {
+          if (msg.fileType?.includes('image/')) {
+            // 处理图片消息
+            let imageUrl = msg.content
+            if (!msg.content.startsWith('http')) {
+              // 如果不是 URL，则转换为 base64
+              imageUrl = `data:${msg.fileType};base64,${msg.content}`
+            }
+
+            return {
+              role: msg.role,
+              content: [
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: imageUrl
+                  }
+                }
+              ]
+            }
+          }
+          // 处理普通文本消息
+          return {
+            role: msg.role,
+            content: msg.content
+          }
         })
 
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
-        const reader = response.body?.getReader()
-        if (!reader) throw new Error('No reader available')
-
-        const decoder = new TextDecoder()
-        let fullMessage = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          const chunk = decoder.decode(value)
-          const lines = chunk
-            .split('\n')
-            .filter((line) => line.trim() !== '' && line.trim() !== 'data: [DONE]')
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6))
-                const content = data.choices[0]?.delta?.content
-                if (content) {
-                  fullMessage += content
-                  // 更新流式消息状态
-                  set((state) => ({
-                    messageStreamingMap: { ...state.messageStreamingMap, [chatId]: fullMessage },
-                  }))
+        // 处理当前发送的消息
+        const currentMessageToSend = message.fileType?.includes('image/')
+          ? {
+              role: message.role,
+              content: [
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: message.content.startsWith('http')
+                      ? message.content
+                      : `data:${message.fileType};base64,${message.content}`
+                  }
                 }
-              } catch (error) {
-                console.error('Error parsing JSON:', error)
+              ]
+            }
+          : {
+              role: message.role,
+              content: message.content
+            }
+
+        // 如果不是需要跳过 AI 响应的消息，则发送请求
+        if (!message.skipAIResponse) {
+          const response = await fetch(`${API_CONFIG.COMMON}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: token,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4-vision-preview',  // 使用支持图片的模型
+              messages: [...messagesToSend, currentMessageToSend],
+              stream: true,
+              temperature: 1,
+              max_tokens: 4096,
+            }),
+          })
+
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+          const reader = response.body?.getReader()
+          if (!reader) throw new Error('No reader available')
+
+          const decoder = new TextDecoder()
+          let fullMessage = ''
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = decoder.decode(value)
+            const lines = chunk
+              .split('\n')
+              .filter((line) => line.trim() !== '' && line.trim() !== 'data: [DONE]')
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6))
+                  const content = data.choices[0]?.delta?.content
+                  if (content) {
+                    fullMessage += content
+                    // 更新流式消息状态
+                    set((state) => ({
+                      messageStreamingMap: { ...state.messageStreamingMap, [chatId]: fullMessage },
+                    }))
+                  }
+                } catch (error) {
+                  console.error('Error parsing JSON:', error)
+                }
               }
             }
           }
-        }
 
-        // 将AI响应添加到消息列表
-        if (fullMessage) {
-          const assistantMessage: ChatMessage = {
-            role: 'assistant',
-            content: fullMessage,
-          }
+          // 将AI响应添加到消息列表
+          if (fullMessage) {
+            const assistantMessage: ChatMessage = {
+              role: 'assistant',
+              content: fullMessage,
+            }
 
-          set((state) => ({
-            chatHistories: state.chatHistories.map((chat) => {
-              if (chat.id === chatId) {
-                return {
-                  ...chat,
-                  messages: [...newMessages, assistantMessage],
+            set((state) => ({
+              chatHistories: state.chatHistories.map((chat) => {
+                if (chat.id === chatId) {
+                  return {
+                    ...chat,
+                    messages: [...newMessages, assistantMessage],
+                  }
                 }
-              }
-              return chat
-            }),
-            messageStreamingMap: { ...state.messageStreamingMap, [chatId]: '' },
-          }))
+                return chat
+              }),
+              messageStreamingMap: { ...state.messageStreamingMap, [chatId]: '' },
+            }))
+          }
         }
       } catch (error) {
         console.error('发送消息失败:', error)

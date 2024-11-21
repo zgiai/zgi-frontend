@@ -59,7 +59,7 @@ async function saveWindowState(window) {
     })
   })
 
-  mainWindow.setMenu(null)
+  // mainWindow.setMenu(null)
 
   if (isProd) {
     await mainWindow.loadURL('app://./home')

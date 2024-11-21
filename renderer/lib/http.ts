@@ -8,6 +8,8 @@ export const API_CONFIG = {
   COMMON: 'https://api.agicto.cn',
 } as const
 
+export  const token = 'sk-DV7fnAi6a6f5qYN2AqEM6VQiyYOS4NTETYRoZHENptDSHdMI'
+
 // Type for API endpoints
 export type ApiEndpoint = keyof typeof API_CONFIG
 
@@ -48,7 +50,7 @@ class Http {
     instance.interceptors.request.use(
       (config) => {
         // const token = localStorage.getItem('auth_token')
-        const token = 'sk-DV7fnAi6a6f5qYN2AqEM6VQiyYOS4NTETYRoZHENptDSHdMI'
+
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }

@@ -2,6 +2,7 @@
 export type Role = 'system' | 'user' | 'assistant'
 
 export interface ChatMessage {
+  skipAIResponse: any
   /** 角色 */
   role: Role
   /** 消息id */

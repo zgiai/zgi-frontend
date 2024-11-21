@@ -11,53 +11,67 @@ const InputArea = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { sendMessage, isLoadingMap, currentChatId } = useChatStore()
 
-  // 检查当前是否正在加载
   const isLoading = currentChatId ? isLoadingMap[currentChatId] : false
 
-  const handleSend = () => {
-    if (isLoading) return // 如果正在加载，直接返回
+  const handleSend = async () => {
+    if (isLoading) return
 
-    // 首先发送文本消息（如果有）
-    if (message.trim()) {
-      sendMessage({
-        id: Date.now().toString(),
-        role: 'user',
-        content: message,
-        timestamp: new Date().toISOString(),
-      })
-    }
+    try {
+      const messages: ChatMessage[] = []
 
-    // 然后单独发送每个附件
-    attachments.forEach((file) => {
-      if (isImageFile(file)) {
-        // 将图片转换为 base64
-        const reader = new FileReader()
-        reader.onload = () => {
-          sendMessage({
-            id: Date.now().toString(),
-            role: 'user',
-            content: reader.result as string,
-            fileType: 'image',
-            fileName: file.name,
-            timestamp: new Date().toISOString(),
+      // 1. 处理所有附件
+      if (attachments.length > 0) {
+        const filePromises = attachments.map((file) => {
+          return new Promise<ChatMessage>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+              const fileContent = reader.result as string
+              const base64Content = fileContent.split(',')[1]
+              
+              resolve({
+                id: Date.now().toString(),
+                role: 'user',
+                content: base64Content,
+                fileType: file.type,
+                fileName: file.name,
+                timestamp: new Date().toISOString(),
+                skipAIResponse: true
+              })
+            }
+            reader.readAsDataURL(file)
           })
-        }
-        reader.readAsDataURL(file)
-      } else {
-        // 处理其他类型文件...
-        sendMessage({
+        })
+
+        // 等待所有文件读取完成
+        const fileMessages = await Promise.all(filePromises)
+        messages.push(...fileMessages)
+      }
+
+      // 2. 添加文本消息（如果有）
+      if (message.trim()) {
+        messages.push({
           id: Date.now().toString(),
           role: 'user',
-          content: `[文件: ${file.name}]`,
-          fileType: file.type,
-          fileName: file.name,
+          content: message.trim(),
           timestamp: new Date().toISOString(),
+          skipAIResponse: false
         })
       }
-    })
 
-    setMessage('')
-    setAttachments([])
+      // 3. 如果有消息要发送
+      if (messages.length > 0) {
+        // 按顺序发送所有消息
+        for (const msg of messages) {
+          await sendMessage(msg)
+        }
+
+        // 清空输入和附件
+        setMessage('')
+        setAttachments([])
+      }
+    } catch (error) {
+      console.error('发送消息失败:', error)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

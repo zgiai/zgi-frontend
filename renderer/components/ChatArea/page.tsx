@@ -1,9 +1,10 @@
 import { useChatStore } from '@/store/chat.store'
-import { Bot, User } from 'lucide-react'
+import { Bot, User, FileText } from 'lucide-react'
 import React, { useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
+import { ImageIcon } from 'lucide-react'
 
 // 消息项组件
 const MessageItem = ({ message, style }) => {
@@ -68,29 +69,189 @@ const MessageItem = ({ message, style }) => {
       )
     }
 
-    // 如果是流式消息且有内容，添加打字机效果的类
     const contentClass = isStreaming ? 'typing-effect' : ''
 
-    if (message.fileType === 'image') {
-      // 处理base64图片数据
-      const imageUrl = message.content.startsWith('data:')
-        ? message.content
-        : `data:image/jpeg;base64,${message.content}`
-
+    // 处理数组形式的消息内容
+    if (Array.isArray(message.content)) {
       return (
-        <div className="max-w-sm">
-          <img
-            src={imageUrl}
-            alt={message.fileName || '图片'}
-            className="rounded-lg max-w-full h-auto"
-          />
-          {message.fileName && <div className="text-sm mt-1 text-gray-500">{message.fileName}</div>}
+        <div className={`${contentClass} break-words whitespace-pre-wrap`}>
+          {message.content.map((item, index) => {
+            if (item.type === 'file') {
+              const isImage = item.fileType?.includes('image/') || 
+                            /\.(jpg|jpeg|png|gif|webp)$/i.test(item.fileName || '')
+
+              if (isImage) {
+                // 修改图片 URL 处理逻辑
+                let imageUrl = ''
+                if (item.content.startsWith('data:') || item.content.startsWith('http')) {
+                  imageUrl = item.content
+                } else {
+                  // 确保添加正确的 MIME type
+                  const mimeType = item.fileType || 
+                    (item.fileName?.toLowerCase().endsWith('.webp') ? 'image/webp' : 'image/jpeg')
+                  imageUrl = `data:${mimeType};base64,${item.content}`
+                }
+
+                return (
+                  <div key={index} className="mb-2">
+                    <img
+                      src={imageUrl}
+                      alt={item.fileName || '图片'}
+                      className="rounded-lg max-w-full h-auto"
+                      onError={(e) => {
+                        console.error('图片加载失败:', e)
+                        const target = e.target as HTMLImageElement
+                        target.style.display = 'none'
+                        const errorDiv = document.createElement('div')
+                        errorDiv.className = 'text-red-500 text-sm mt-2'
+                        errorDiv.textContent = '图片加载失败'
+                        target.parentElement?.appendChild(errorDiv)
+                      }}
+                    />
+                    {item.fileName && (
+                      <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
+                        <ImageIcon size={16} />
+                        <span>{item.fileName}</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+              // 处理base64图片数据
+              const imageUrl = item.content.startsWith('data:')
+                ? item.content
+                : `data:image/jpeg;base64,${item.content}`
+
+              return (
+                <div key={index} className="mb-2 break-words whitespace-pre-wrap">
+                  <img
+                    src={imageUrl}
+                    alt={item.fileName || '图片'}
+                    className="rounded-lg max-w-full h-auto"
+                  />
+                  {item.fileName && <div className="text-sm mt-1 text-gray-500">{item.fileName}</div>}
+                </div>
+              )
+            } else if (item.type === 'text') {
+              return (
+                <div key={index} className="mb-2 break-words whitespace-pre-wrap">
+                  <ReactMarkdown
+                    components={{
+                      code({ node, className, children, ...props }) {
+                        const match = /language-(\w+)/.exec(className || '')
+                        
+                        if (!match) {
+                          return (
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          )
+                        }
+
+                        const code = String(children).replace(/\n$/, '')
+                        // 使用新的 ID 生成函数
+                        const codeId = generateCodeId(code)
+                        const isCopied = copiedMap[codeId]
+                        
+                        return (
+                          <div className="relative group">
+                            <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100">
+                              <button
+                                onClick={() => handleCopyCode(code, codeId)}
+                                disabled={isCopied}
+                                className={`px-2 py-1 rounded text-xs ${
+                                  isCopied 
+                                    ? 'bg-gray-500 text-white cursor-not-allowed' 
+                                    : 'bg-gray-700 hover:bg-gray-600 text-white'
+                                }`}
+                              >
+                                {isCopied ? '已复制' : '复制代码'}
+                              </button>
+                            </div>
+                            <SyntaxHighlighter 
+                              style={vscDarkPlus} 
+                              language={match[1]} 
+                              PreTag="div"
+                              {...props}
+                            >
+                              {code}
+                            </SyntaxHighlighter>
+                          </div>
+                        )
+                      },
+                    }}
+                  >
+                    {item.content}
+                  </ReactMarkdown>
+                </div>
+              )
+            }
+            return null
+          })}
         </div>
       )
     }
 
+    // 处理文件类型消息
+    if (message.fileType || message.fileName) {
+      const isImage = message.fileType?.includes('image/') || 
+                     /\.(jpg|jpeg|png|gif|webp)$/i.test(message.fileName || '')
+
+      if (isImage) {
+        // 处理图片显示
+        let imageUrl = ''
+        if (message.content.startsWith('data:') || message.content.startsWith('http')) {
+          imageUrl = message.content
+        } else {
+          // 确保添加正确的 MIME type
+          const mimeType = message.fileType || 
+            (message.fileName?.toLowerCase().endsWith('.webp') ? 'image/webp' : 'image/jpeg')
+          imageUrl = `data:${mimeType};base64,${message.content}`
+        }
+
+        return (
+          <div className="max-w-sm">
+            <img
+              src={imageUrl}
+              alt={message.fileName || '图片'}
+              className="rounded-lg max-w-full h-auto"
+              onError={(e) => {
+                console.error('图片加载失败:', e)
+                const target = e.target as HTMLImageElement
+                target.style.display = 'none'
+                const errorDiv = document.createElement('div')
+                errorDiv.className = 'text-red-500 text-sm mt-2'
+                errorDiv.textContent = '图片加载失败'
+                target.parentElement?.appendChild(errorDiv)
+              }}
+            />
+            {message.fileName && (
+              <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
+                <ImageIcon size={16} />
+                <span>{message.fileName}</span>
+              </div>
+            )}
+          </div>
+        )
+      }
+
+      // 处理其他类型文件
+      return (
+        <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+          <FileText size={20} className="text-gray-500" />
+          <span className="text-sm text-gray-700">{message.fileName || '未知文件'}</span>
+          {message.fileType && (
+            <span className="text-xs text-gray-500">
+              ({message.fileType.split('/').pop()?.toUpperCase() || '未知格式'})
+            </span>
+          )}
+        </div>
+      )
+    }
+
+    // 处理普通文本消息
     return (
-      <div className={contentClass}>
+      <div className={`${contentClass} break-words whitespace-pre-wrap`}>
         <ReactMarkdown
           components={{
             code({ node, className, children, ...props }) {
@@ -135,6 +296,9 @@ const MessageItem = ({ message, style }) => {
                 </div>
               )
             },
+            p: ({ children }) => (
+              <p className="break-words whitespace-pre-wrap">{children}</p>
+            ),
           }}
         >
           {message.content}
@@ -161,7 +325,7 @@ const MessageItem = ({ message, style }) => {
         </div>
 
         <div
-          className={`shrink-0 max-w-[80%] rounded-lg p-3 ${
+          className={`shrink-0 max-w-[80%] rounded-lg p-3 overflow-hidden ${
             isUser ? 'bg-[#F5FAFF] text-gray-800' : 'bg-white text-gray-800'
           }`}
         >
