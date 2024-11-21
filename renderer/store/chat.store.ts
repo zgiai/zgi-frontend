@@ -21,7 +21,7 @@ interface ChatStore {
   updateChatTitle: (chatId: string, title: string) => void // 更新对话标题
   clearAllChats: () => void // 清空所有对话
   loadChatsFromDisk: () => void // 从磁盘加载对话
-  saveChatsToDisk: () => void // 保存对��到磁盘
+  saveChatsToDisk: () => void // 保存对话到磁盘
   sendMessage: (message: ChatMessage) => void // 发送消息
 }
 
@@ -156,7 +156,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
 
       // 检查是否已经在加载状态
       const isLoading = get().isLoadingMap[chatId || '']
-      if (isLoading) return // 如果正在加载，直接返回
+      if (isLoading) return
 
       if (!chatId) {
         const newChat = {
@@ -174,7 +174,6 @@ export const useChatStore = create<ChatStore>()((set, get) => {
         chatId = newChat.id
       }
 
-      // 获取当前聊天记录
       const currentChat = get().chatHistories.find((chat) => chat.id === chatId)
       if (!currentChat) return
 
@@ -272,19 +271,23 @@ export const useChatStore = create<ChatStore>()((set, get) => {
         }
       } catch (error) {
         console.error('发送消息失败:', error)
-        // 添加错误提示
+        // 只在 messageStreamingMap 中显示错误消息，不存入历史记录
         set((state) => ({
-          messageStreamingMap: {
-            ...state.messageStreamingMap,
-            [chatId]: '抱歉，发送消息失败，请稍后重试。',
-          },
+          messageStreamingMap: { 
+            ...state.messageStreamingMap, 
+            [chatId]: '抱歉，发送消息失败，请稍后重试。' 
+          }
         }))
       } finally {
-        // 确保在完成后重置加载状态
+        // 重置加载状态
         set((state) => ({
           isLoadingMap: { ...state.isLoadingMap, [chatId]: false },
         }))
-        get().saveChatsToDisk()
+        
+        // 只有在成功的情况下才保存到磁盘
+        if (!get().messageStreamingMap[chatId]) {
+          get().saveChatsToDisk()
+        }
       }
     },
   }

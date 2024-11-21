@@ -114,40 +114,41 @@ const ChatArea = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const currentChat = chatHistories.find((chat) => chat.id === currentChatId)
 
-  useEffect(() => {
-    loadChatsFromDisk()
-  }, [])
-
-  // 获取当前对话的流式消息和加载状态
   const streamingMessage = messageStreamingMap[currentChatId || '']
   const isLoading = isLoadingMap[currentChatId || '']
 
-  // 合并消息列表，包含实时流式消息
   const getAllMessages = () => {
     if (!currentChat) return []
-
     const baseMessages = currentChat.messages || []
-
     if (streamingMessage || isLoading) {
       return [
         ...baseMessages,
         {
           role: 'assistant',
           content: streamingMessage || '',
-          isStreaming: true,
         },
       ]
     }
-
     return baseMessages
   }
 
   const messages = getAllMessages()
 
-  // 自动滚动到底部
-  useEffect(() => {
+  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length, streamingMessage])
+  }
+
+  // 首次加载
+  useEffect(() => {
+    loadChatsFromDisk()
+  }, [])
+
+  // 切换聊天室时滚动到底部
+  useEffect(() => {
+    if (currentChatId) {
+      scrollToBottom()
+    }
+  }, [currentChatId])
 
   if (!currentChatId) {
     return (
