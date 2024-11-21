@@ -9,9 +9,14 @@ const InputArea = () => {
   const [message, setMessage] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { sendMessage } = useChatStore()
+  const { sendMessage, isLoadingMap, currentChatId } = useChatStore()
+
+  // 检查当前是否正在加载
+  const isLoading = currentChatId ? isLoadingMap[currentChatId] : false
 
   const handleSend = () => {
+    if (isLoading) return // 如果正在加载，直接返回
+
     // 首先发送文本消息（如果有）
     if (message.trim()) {
       sendMessage({
@@ -58,7 +63,10 @@ const InputArea = () => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSend()
+      if (!isLoading) {
+        // 添加加载状态检查
+        handleSend()
+      }
     }
   }
 
@@ -189,11 +197,22 @@ const InputArea = () => {
               {/* 发送按钮 */}
               <button
                 onClick={handleSend}
-                className="bg-[#3b82f6] text-white px-4 py-1.5 rounded-lg hover:bg-blue-600 flex items-center gap-2"
-                disabled={!message.trim() && attachments.length === 0}
+                className={`${
+                  isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#3b82f6] hover:bg-blue-600'
+                } text-white px-4 py-1.5 rounded-lg flex items-center gap-2`}
+                disabled={isLoading || (!message.trim() && attachments.length === 0)}
               >
-                <Send size={16} />
-                <span>发送</span>
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>发送中...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} />
+                    <span>发送</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -21,7 +21,7 @@ interface ChatStore {
   updateChatTitle: (chatId: string, title: string) => void // 更新对话标题
   clearAllChats: () => void // 清空所有对话
   loadChatsFromDisk: () => void // 从磁盘加载对话
-  saveChatsToDisk: () => void // 保存对话到磁盘
+  saveChatsToDisk: () => void // 保存对��到磁盘
   sendMessage: (message: ChatMessage) => void // 发送消息
 }
 
@@ -121,15 +121,12 @@ export const useChatStore = create<ChatStore>()((set, get) => {
      */
     loadChatsFromDisk: async () => {
       try {
-        console.log('开始加载聊天记录...')
         const data = await storageAdapter.load()
-        console.log('加载到的数据:', data)
         if (data) {
           set({
             chatHistories: data.chatHistories || [],
             currentChatId: data.currentChatId || null,
           })
-          console.log('数据已设置到 store')
         }
       } catch (error) {
         console.error('加载聊天记录失败:', error)
@@ -155,9 +152,12 @@ export const useChatStore = create<ChatStore>()((set, get) => {
      */
     sendMessage: async (message: ChatMessage) => {
       const { currentChatId } = get()
-
-      // 如果没有当前对话，创建新对话
       let chatId = currentChatId
+
+      // 检查是否已经在加载状态
+      const isLoading = get().isLoadingMap[chatId || '']
+      if (isLoading) return // 如果正在加载，直接返回
+
       if (!chatId) {
         const newChat = {
           id: Date.now().toString(),
@@ -174,19 +174,17 @@ export const useChatStore = create<ChatStore>()((set, get) => {
         chatId = newChat.id
       }
 
-      // 获取当前对话并验证
+      // 获取当前聊天记录
       const currentChat = get().chatHistories.find((chat) => chat.id === chatId)
       if (!currentChat) return
 
-      // 添加用户消息并更新状态
+      // 添加用户消息并设置加载状态
       const newMessages = [...currentChat.messages, message]
       set((state) => ({
         chatHistories: state.chatHistories.map((chat) => {
           if (chat.id === chatId) {
             return {
               ...chat,
-              title:
-                chat.messages.length === 0 ? message.content.slice(0, 20) || '新对话' : chat.title,
               messages: newMessages,
             }
           }
@@ -197,6 +195,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
       }))
 
       try {
+        // 发送请求到AI并获取响应
         const token = 'sk-DV7fnAi6a6f5qYN2AqEM6VQiyYOS4NTETYRoZHENptDSHdMI'
         const response = await fetch(`${API_CONFIG.COMMON}/v1/chat/completions`, {
           method: 'POST',
@@ -251,7 +250,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
           }
         }
 
-        // 完成后添加完整消息
+        // 将AI响应添加到消息列表
         if (fullMessage) {
           const assistantMessage: ChatMessage = {
             role: 'assistant',
@@ -273,7 +272,15 @@ export const useChatStore = create<ChatStore>()((set, get) => {
         }
       } catch (error) {
         console.error('发送消息失败:', error)
+        // 添加错误提示
+        set((state) => ({
+          messageStreamingMap: {
+            ...state.messageStreamingMap,
+            [chatId]: '抱歉，发送消息失败，请稍后重试。',
+          },
+        }))
       } finally {
+        // 确保在完成后重置加载状态
         set((state) => ({
           isLoadingMap: { ...state.isLoadingMap, [chatId]: false },
         }))

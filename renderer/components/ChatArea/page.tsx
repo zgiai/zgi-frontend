@@ -82,7 +82,7 @@ const MessageItem = ({ message, style }) => {
   return (
     <div style={style} className="py-2">
       <div className={`flex items-start gap-4 px-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 mt-1.5">
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center ${
               isUser ? 'bg-purple-600' : 'bg-gray-200'
@@ -97,7 +97,7 @@ const MessageItem = ({ message, style }) => {
         </div>
 
         <div
-          className={`max-w-[80%] rounded-lg p-3 ${
+          className={`shrink-0 max-w-[80%] rounded-lg p-3 ${
             isUser ? 'bg-[#F5FAFF] text-gray-800' : 'bg-white text-gray-800'
           }`}
         >
