@@ -9,6 +9,40 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
 const MessageItem = ({ message, style }) => {
   const isUser = message.role === 'user'
   const isStreaming = message.isStreaming
+  // 添加复制状态
+  const [copiedMap, setCopiedMap] = React.useState<Record<string, boolean>>({})
+
+  // 添加一个安全的字符串转换函数
+  const generateCodeId = (code: string) => {
+    // 使用简单的哈希函数
+    let hash = 0
+    for (let i = 0; i < code.length; i++) {
+      const char = code.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // Convert to 32bit integer
+    }
+    return `code-${Math.abs(hash)}`
+  }
+
+  // 修改复制代码功能
+  const handleCopyCode = (code: string, codeId: string) => {
+    // 如果正在显示"已复制"状态，则不执行复制
+    if (copiedMap[codeId]) return
+
+    navigator.clipboard.writeText(code)
+      .then(() => {
+        // 设置复制成功状态
+        setCopiedMap(prev => ({ ...prev, [codeId]: true }))
+        
+        // 1秒后重置状态
+        setTimeout(() => {
+          setCopiedMap(prev => ({ ...prev, [codeId]: false }))
+        }, 1000)
+      })
+      .catch(err => {
+        console.error('复制失败:', err)
+      })
+  }
 
   const renderContent = () => {
     // 如果是流式消息且没有内容（正在加载）
@@ -61,14 +95,44 @@ const MessageItem = ({ message, style }) => {
           components={{
             code({ node, className, children, ...props }) {
               const match = /language-(\w+)/.exec(className || '')
-              return !match ? (
-                <code className={className} {...props}>
-                  {children}
-                </code>
-              ) : (
-                <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div" {...props}>
-                  {String(children).replace(/\n$/, '')}
-                </SyntaxHighlighter>
+              
+              if (!match) {
+                return (
+                  <code className={className} {...props}>
+                    {children}
+                  </code>
+                )
+              }
+
+              const code = String(children).replace(/\n$/, '')
+              // 使用新的 ID 生成函数
+              const codeId = generateCodeId(code)
+              const isCopied = copiedMap[codeId]
+              
+              return (
+                <div className="relative group">
+                  <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100">
+                    <button
+                      onClick={() => handleCopyCode(code, codeId)}
+                      disabled={isCopied}
+                      className={`px-2 py-1 rounded text-xs ${
+                        isCopied 
+                          ? 'bg-gray-500 text-white cursor-not-allowed' 
+                          : 'bg-gray-700 hover:bg-gray-600 text-white'
+                      }`}
+                    >
+                      {isCopied ? '已复制' : '复制代码'}
+                    </button>
+                  </div>
+                  <SyntaxHighlighter 
+                    style={vscDarkPlus} 
+                    language={match[1]} 
+                    PreTag="div"
+                    {...props}
+                  >
+                    {code}
+                  </SyntaxHighlighter>
+                </div>
               )
             },
           }}
@@ -143,12 +207,12 @@ const ChatArea = () => {
     loadChatsFromDisk()
   }, [])
 
-  // 切换聊天室时滚动到底部
+  // 监听消息变化和切换聊天室
   useEffect(() => {
-    if (currentChatId) {
+    if (currentChatId || messages.length > 0 || streamingMessage) {
       scrollToBottom()
     }
-  }, [currentChatId])
+  }, [currentChatId, messages.length, streamingMessage])
 
   if (!currentChatId) {
     return (

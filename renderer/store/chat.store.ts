@@ -203,18 +203,15 @@ export const useChatStore = create<ChatStore>()((set, get) => {
             Authorization: token,
           },
           body: JSON.stringify({
-            model: 'gpt-4o',
+            model: 'gpt-3.5-turbo',
             messages: newMessages,
             stream: true,
-            temperature: 0.7,
+            temperature: 1,
             top_p: 1.0,
-            n: 1,
-            max_tokens: 4096,
           }),
         })
 
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
-
         const reader = response.body?.getReader()
         if (!reader) throw new Error('No reader available')
 

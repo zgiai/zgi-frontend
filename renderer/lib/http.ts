@@ -4,7 +4,8 @@ import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 export const API_CONFIG = {
   ADMIN: 'https://api.zgi.ai',
   CLIENT: 'https://api.zgi.ai',
-  COMMON: 'http://8.146.199.164:8088',
+  // COMMON: 'http://8.146.199.164:8088',
+  COMMON: 'https://api.agicto.cn',
 } as const
 
 // Type for API endpoints
