@@ -1,7 +1,9 @@
+import fs from 'node:fs/promises'
 import path from 'node:path'
-import { app, ipcMain } from 'electron'
+import { app } from 'electron'
 import serve from 'electron-serve'
 import { createWindow } from './helpers/create-window'
+import { registerIpcHandlers } from './ipc/config.ipc'
 
 const isProd = process.env.NODE_ENV === 'production'
 
@@ -10,19 +12,54 @@ if (isProd) {
 } else {
   app.setPath('userData', `${app.getPath('userData')} (development)`)
 }
+
+const WINDOW_STATE_FILE = path.join(app.getPath('userData'), 'window-state.json')
+
+// 读取窗口状态
+async function loadWindowState() {
+  try {
+    const data = await fs.readFile(WINDOW_STATE_FILE, 'utf-8')
+    return JSON.parse(data)
+  } catch (_e) {
+    return null
+  }
+}
+
+// 保存窗口状态
+async function saveWindowState(window) {
+  const state = {
+    bounds: window.getBounds(),
+    isMaximized: window.isMaximized(),
+  }
+  await fs.writeFile(WINDOW_STATE_FILE, JSON.stringify(state), 'utf-8')
+}
+// 主程序启动
 ;(async () => {
   await app.whenReady()
+  registerIpcHandlers()
+  const windowState = await loadWindowState()
 
   const mainWindow = createWindow('main', {
-    width: 1000,
-    height: 600,
+    width: windowState?.bounds?.width || 1000,
+    height: windowState?.bounds?.height || 600,
+    x: windowState?.bounds?.x,
+    y: windowState?.bounds?.y,
     title: 'ZGIChat',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
   })
 
-  mainWindow.setMenu(null) // 顶部菜单
+  if (!windowState || windowState.isMaximized) {
+    mainWindow.maximize()
+  }
+  ;['resize', 'move'].forEach((event) => {
+    mainWindow.on(event, () => {
+      saveWindowState(mainWindow)
+    })
+  })
+
+  // mainWindow.setMenu(null)
 
   if (isProd) {
     await mainWindow.loadURL('app://./home')
@@ -35,8 +72,4 @@ if (isProd) {
 
 app.on('window-all-closed', () => {
   app.quit()
-})
-
-ipcMain.on('message', async (event, arg) => {
-  event.reply('message', `${arg} World!`)
 })

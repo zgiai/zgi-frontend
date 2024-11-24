@@ -1,6 +1,20 @@
+// 定义消息类型
+export type Role = 'system' | 'user' | 'assistant'
+
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant'
+  skipAIResponse: any
+  /** 角色 */
+  role: Role
+  /** 消息id */
+  id?: string
+  /** 消息内容 */
   content: string
+  /** 消息时间戳 */
+  timestamp?: string
+  /** 文件类型 */
+  fileType?: string
+  /** 文件名称 */
+  fileName?: string
 }
 
 export interface ChatCompletionRequest {
@@ -15,5 +29,22 @@ export interface ChatCompletionRequest {
 
 export interface ChatCompletionResponse {
   message: ChatMessage
-  // Add other response fields if needed
-} 
+  id: string
+  created: number
+  model: string
+  usage: {
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
+}
+
+export interface ChatHistory {
+  id: string
+  title: string
+  messages: ChatMessage[]
+  createdAt: string
+  updatedAt?: number
+  model?: string
+  favorite?: boolean
+}

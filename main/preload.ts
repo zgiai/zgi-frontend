@@ -1,20 +1,16 @@
-import { type IpcRendererEvent, contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer } from 'electron'
 
 const handler = {
-	send(channel: string, value: unknown) {
-		ipcRenderer.send(channel, value);
-	},
-	on(channel: string, callback: (...args: unknown[]) => void) {
-		const subscription = (_event: IpcRendererEvent, ...args: unknown[]) =>
-			callback(...args);
-		ipcRenderer.on(channel, subscription);
+  // 主动发送通知，并获取返回数据，electron层使用handle处理
+  invoke: (channel: string, ...args: any[]) => {
+    return ipcRenderer.invoke(channel, ...args)
+  },
+  // 渲染进程监听到主进程发来的通知，执行相关的操作
+  receive: (channel: string, func: (...args: any[]) => void) => {
+    ipcRenderer.on(channel, (event, ...args) => func(...args))
+  },
+}
 
-		return () => {
-			ipcRenderer.removeListener(channel, subscription);
-		};
-	},
-};
+contextBridge.exposeInMainWorld('ipc', handler)
 
-contextBridge.exposeInMainWorld("ipc", handler);
-
-export type IpcHandler = typeof handler;
+export type IpcHandler = typeof handler

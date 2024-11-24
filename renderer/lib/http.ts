@@ -4,14 +4,18 @@ import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 export const API_CONFIG = {
   ADMIN: 'https://api.zgi.ai',
   CLIENT: 'https://api.zgi.ai',
-  COMMON: 'https://api.zgi.ai',
+  // COMMON: 'http://8.146.199.164:8088',
+  COMMON: 'https://api.agicto.cn',
 } as const
+
+export  const token = 'sk-DV7fnAi6a6f5qYN2AqEM6VQiyYOS4NTETYRoZHENptDSHdMI'
 
 // Type for API endpoints
 export type ApiEndpoint = keyof typeof API_CONFIG
 
 interface HttpConfig extends AxiosRequestConfig {
   endpoint?: ApiEndpoint
+  body: any
 }
 
 class Http {
@@ -45,7 +49,8 @@ class Http {
     // Request interceptor
     instance.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem('auth_token')
+        // const token = localStorage.getItem('auth_token')
+
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
@@ -123,6 +128,23 @@ class Http {
     data?: Record<string, unknown>,
     config: HttpConfig = {},
   ): Promise<T> {
+    const { endpoint, ...axiosConfig } = config
+    const instance = this.getInstance(endpoint)
+
+    // 如果需要流式响应，使用特殊处理
+    if (config.responseType === 'stream') {
+      const response = await instance.post(url, data, {
+        ...axiosConfig,
+        responseType: 'stream',
+        // 重要：添加以下配置以支持流式响应
+        onDownloadProgress: (progressEvent) => {
+          // 处理下载进度
+        },
+      })
+      return response as T
+    }
+
+    // 普通请求使用原有逻辑
     return this.request<T>({
       ...config,
       method: 'POST',
