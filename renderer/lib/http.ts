@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
+import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 
 // Define API configurations
 export const API_CONFIG = {
@@ -31,7 +31,7 @@ class Http {
           'Content-Type': 'application/json',
           // Add CORS headers
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,PATCH,OPTIONS'
+          'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,PATCH,OPTIONS',
         },
       })
 
@@ -53,7 +53,7 @@ class Http {
       },
       (error) => {
         return Promise.reject(error)
-      }
+      },
     )
 
     // Response interceptor
@@ -83,7 +83,7 @@ class Http {
           }
         }
         return Promise.reject(error)
-      }
+      },
     )
   }
 
@@ -119,9 +119,9 @@ class Http {
 
   // POST method
   public async post<T>(
-    url: string, 
-    data?: Record<string, unknown>, 
-    config: HttpConfig = {}
+    url: string,
+    data?: Record<string, unknown>,
+    config: HttpConfig = {},
   ): Promise<T> {
     return this.request<T>({
       ...config,
@@ -133,9 +133,9 @@ class Http {
 
   // PUT method
   public async put<T>(
-    url: string, 
-    data?: Record<string, unknown>, 
-    config: HttpConfig = {}
+    url: string,
+    data?: Record<string, unknown>,
+    config: HttpConfig = {},
   ): Promise<T> {
     return this.request<T>({
       ...config,
@@ -156,4 +156,4 @@ class Http {
 }
 
 // Create and export a single instance
-export const http = new Http() 
+export const http = new Http()
